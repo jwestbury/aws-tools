@@ -52,6 +52,10 @@ coverage.xml
 # Sphinx documentation
 docs/_build/
 
+# AWS stuff
+.boto
+*.boto
+
 
 # =========================
 # Operating System Files
