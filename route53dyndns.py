@@ -6,9 +6,11 @@ import boto.route53
 def makeConnection(keyid = None, secret = None, connSource = None, region = "us-west-2"):
     """Makes a connection to AWS Route 53 and returns that connection as an object."""
     if connSource == "user":
+        # boto connection for argument-supplied credentials
         r53 = boto.route53.connect_to_region(region, aws_access_key_id = keyid,
                                              aws_secret_access_key = secret)
     elif connSource == "file":
+        # boto connection for credentials stored in a file
         r53 = boto.route53.connect_to_region(region)
     else:
         print "Please specify a source for connection credentials."
@@ -17,20 +19,22 @@ def makeConnection(keyid = None, secret = None, connSource = None, region = "us-
 
 def getIpAddress():
     """Gets your IP from WTF Is My IP and returns it as a string."""
+    # best source I know of for text or JSON IP address
     return "%s" % requests.get('http://wtfismyip.com/json').json()['YourFuckingIPAddress']
 
 def getRecord(zone = None, recordName = None, connection = None, root = None):
     """Connects to a Route 53 zone and gets a specified record. Returns record and zone as objects."""
-    if not (zone and connection) and not (recordName or root):
+    if not (zone and connection) or not (recordName or root):
         print "Please provide a zone, a record name, and a Route 53 connection object."
         exit()
-    z = connection.get_zone("%s." % zone)
+    z = connection.get_zone("%s." % zone) # instantiate Route 53 zone object
     if root:
-        rec = z.get_a(zone)
+        rec = z.get_a(zone) # get the A record for the root URL in the zone (e.g. foo.com.)
         return rec, z
     recs = z.get_records()
     for rec in recs:
-        #I'm so sorry for this next bit. It 
+        # drop the zone and preceding dot in order to get the name of just our record without the zone
+        # e.g. the complete record is "bar.foo.com." and this will return just "bar"
         if rec.name.replace(".%s." % zone, "") == recordName:
             return rec, z
     print "Couldn't find any matching records within zone %s." % zone
@@ -40,10 +44,11 @@ def updateRecord(record = None, ipaddr = None, zone = None):
     if not (record and ipaddr and zone):
         print "Please provide a record object, IP address, and zone object."
         exit()
-    if ipaddr not in record.resource_records:
-        status = zone.update_record(record, ipaddr)
+    if ipaddr not in record.resource_records: # does the IP address match the record?
+        status = zone.update_record(record, ipaddr) # let's update it if not
         status.update()
-        while not ("%s" % status) == "<Status:INSYNC>":
+        while not ("%s" % status) == "<Status:INSYNC>": # go until we've confirmed it's updated
+            # should probably have some logic here to prevent this from going forever
             print "Zone file not updated yet, checking again in 30 seconds."
             sleep(30)
             status.update()
